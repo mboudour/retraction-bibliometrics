@@ -1,5 +1,7 @@
 # Retraction Bibliometric Study: A Computational Analysis of Scientific Retractions
 
+**Moses Boudourides and Emanuela Chiriac**
+
 This repository contains the complete computational pipeline, data collection scripts, and analysis code for a comprehensive bibliometric study of scientific retractions. The project investigates the scale, causes, and consequences of retracted literature using a corpus of over 58,000 retracted papers.
 
 ## Project Overview
@@ -82,3 +84,9 @@ retraction-bibliometrics/
 
 ## Authors & Acknowledgements
 This computational pipeline was developed for the Retraction Bibliometric Study. Data provided by Retraction Watch (via Crossref) and OpenAlex.
+
+## Copyright
+
+© 2026 Moses Boudourides. All rights reserved.
+
+This repository and its contents are made available for academic peer review purposes only. No part of this work may be reproduced, distributed, or used in any form without the express written permission of the authors.
