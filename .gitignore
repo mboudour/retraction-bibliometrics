@@ -1,0 +1,23 @@
+# Raw data files (too large for git)
+data_collection/raw_data/
+**/raw_data/
+*.jsonl
+*_raw.csv
+*_clean.csv
+openalex_*.csv
+retraction_watch_*.csv
+*_cache.jsonl
+*_feature_matrix.csv
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Jupyter
+.ipynb_checkpoints/

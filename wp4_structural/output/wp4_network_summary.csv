@@ -1,0 +1,9 @@
+Metric,Value
+nodes,1330764.0
+edges,1684606.0
+retracted_nodes,58326.0
+non_retracted_nodes,1272438.0
+mean_pagerank_retracted,7.345123514569806e-07
+mean_pagerank_non_retracted,7.522243382929152e-07
+mean_in_degree_retracted,0.3824709392037856
+mean_in_degree_non_retracted,1.3063882090915235
