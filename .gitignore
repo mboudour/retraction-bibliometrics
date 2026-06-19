@@ -21,3 +21,13 @@ __pycache__/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Large output CSVs (>50MB) — excluded from git
+wp1_descriptive/output/merged_dataset.csv
+wp2_citation_decay/output/wp2_citation_long.csv
+wp4_structural/output/wp4_network_metrics.csv
+wp4_structural/output/wp4_node_metrics.csv
+wp3_contagion/output/wp3_coauthor_network.csv
+wp3_contagion/output/wp3_citing_papers.csv
+wp3_contagion/output/wp3_author_trajectory.csv
+wp5_prediction/output/wp5_features.csv
