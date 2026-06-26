@@ -34,6 +34,7 @@ def _find_merged():
         os.path.join(HERE, "..", "wp1_descriptive", "output", "merged_dataset.csv"),
         os.path.join(HERE, "wp1_descriptive", "output", "merged_dataset.csv"),
         "/home/ubuntu/final_review/wp1_descriptive/output/merged_dataset.csv",
+        "/home/ubuntu/final_review/descriptive_statistics/output/merged_dataset.csv",
     ]
     for c in candidates:
         if os.path.exists(c):
@@ -130,37 +131,55 @@ print(f"  Country stats saved: {len(country_stats)} countries")
 # ── 2. Institution-level analysis ───────────────────────────────────────────
 print("Computing institution statistics …")
 
-# Keywords that identify a segment as a named institution (university/hospital/institute)
-INST_KEYWORDS = [
-    "university", "université", "universitat", "universidade", "universidad",
-    "institute", "institut", "college", "school of", "hospital", "academy",
-    "centre", "center", "foundation", "clinic", "klinikum", "faculty",
+# Keywords that identify a segment part as a university-level institution
+# (used to extract the parent institution name for grouping)
+UNI_KEYWORDS = [
+    "university", "universit\u00e9", "universitat", "universidade", "universidad",
+    "institute of technology", "institute of science", "institute of medicine",
+    "institute of engineering", "institute of management",
+    "medical college", "engineering college", "dental college",
+    "school of medicine", "school of public health",
+    "academy", "klinikum",
+]
+# Broader fallback keywords (used only when no UNI_KEYWORD match is found)
+INST_FALLBACK = [
+    "institute", "hospital", "college", "school",
+    "centre", "center", "clinic", "foundation",
 ]
 
 def extract_institution_name(seg):
     """
-    From a segment like 'Department of X, University of Y, City, Country'
-    return 'University of Y'. Falls back to the full segment if no keyword found.
+    Extract the university/institution name from a comma-delimited affiliation segment.
+    Priority: university-level keywords first, then broader institution keywords.
+    Returns None if no institution-level part is found (segment will be skipped).
     """
     parts = [p.strip() for p in seg.split(",")]
+    # First pass: look for university-level keywords
     for part in parts:
         pl = part.lower()
-        if any(kw in pl for kw in INST_KEYWORDS):
+        if any(kw in pl for kw in UNI_KEYWORDS):
             return part
-    # Fallback: return the full segment (truncated)
-    return seg[:80].strip()
+    # Second pass: look for broader institution keywords
+    for part in parts:
+        pl = part.lower()
+        if any(kw in pl for kw in INST_FALLBACK):
+            return part
+    # Fallback: return None to skip this segment
+    return None
 
 inst_rows = []
 for _, row in df.iterrows():
     raw = str(row.get("Institution", "")) if pd.notna(row.get("Institution")) else ""
     segments = [s.strip() for s in raw.split(";") if s.strip()]
     if not segments:
-        segments = ["Unknown"]
+        continue
+    seen_in_row = set()  # avoid double-counting same university within one paper
     for seg in segments:
         if seg.lower() in ("unavailable", "unknown", ""):
             continue
         name = extract_institution_name(seg)
-        if name:
+        if name and name not in seen_in_row:
+            seen_in_row.add(name)
             inst_rows.append({
                 "institution":     name,
                 "country":         str(row.get("Country", "")).split(";")[0].strip(),
@@ -182,9 +201,25 @@ inst_stats = (
        .reset_index()
        .sort_values("retraction_count", ascending=False)
 )
-# Filter out very generic / noisy segments
-noise = {"Department", "School", "College", "Faculty", "Institute", "Laboratory",
-         "Center", "Centre", "Division", "Section", "Unit", "Unknown", ""}
+# Filter out very generic / noisy segments (standalone labels without a proper name)
+noise = {
+    "Department", "School", "College", "Faculty", "Institute", "Laboratory",
+    "Center", "Centre", "Division", "Section", "Unit", "Unknown", "",
+    "School of Medicine", "School of Public Health", "School of Pharmacy",
+    "School of Nursing", "School of Dentistry", "School of Engineering",
+    "School of Science", "School of Technology", "School of Business",
+    "Medical School", "Graduate School", "School of Basic Medicine",
+    "School of Clinical Medicine", "School of Life Sciences",
+    "School of Biological Sciences", "School of Chemistry",
+    "School of Mathematics", "School of Physics", "School of Computer Science",
+    "School of Information Technology", "School of Management",
+    "School of Economics", "School of Education",
+    "College of Medicine", "College of Science", "College of Engineering",
+    "College of Pharmacy", "College of Nursing", "College of Dentistry",
+    "Faculty of Medicine", "Faculty of Science", "Faculty of Engineering",
+    "Faculty of Pharmacy", "Faculty of Dentistry",
+    "Hospital", "Medical Center", "Medical Centre",
+}
 inst_stats = inst_stats[~inst_stats["institution"].isin(noise)]
 inst_stats.to_csv(os.path.join(OUT, "wp1_institution_stats.csv"), index=False)
 print(f"  Institution stats saved: {len(inst_stats)} institutions")
