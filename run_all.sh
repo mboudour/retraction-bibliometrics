@@ -53,35 +53,35 @@ echo ""
 # WP1: Descriptive Mapping
 # ---------------------------------------------------------------------------
 echo "[WP1] Descriptive mapping …"
-python3 wp1_descriptive/scripts/wp1_descriptive_mapping.py
+python3 descriptive_statistics/scripts/descriptive_statistics_mapping.py
 echo ""
 
 # ---------------------------------------------------------------------------
 # WP2: Citation Decay (Event Study)
 # ---------------------------------------------------------------------------
 echo "[WP2] Citation decay event study …"
-python3 wp2_citation_decay/scripts/wp2_citation_decay.py
+python3 citation_decay/scripts/citation_decay.py
 echo ""
 
 # ---------------------------------------------------------------------------
 # WP3: Retraction Contagion
 # ---------------------------------------------------------------------------
 echo "[WP3] Retraction contagion and collaboration ripple …"
-python3 wp3_contagion/scripts/wp3_contagion.py
+python3 contagion_analysis/scripts/contagion_analysis.py
 echo ""
 
 # ---------------------------------------------------------------------------
 # WP4: Structural Vulnerability
 # ---------------------------------------------------------------------------
 echo "[WP4] Network construction and structural vulnerability …"
-python3 wp4_structural/scripts/wp4_structural_vulnerability.py
+python3 structural_network/scripts/structural_network_vulnerability.py
 echo ""
 
 # ---------------------------------------------------------------------------
 # WP5: Predictive Modelling
 # ---------------------------------------------------------------------------
 echo "[WP5] Predictive machine-learning pipeline …"
-python3 wp5_prediction/scripts/wp5_prediction.py
+python3 predictive_modelling/scripts/predictive_modelling.py
 echo ""
 
 echo "============================================================"

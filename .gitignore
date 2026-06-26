@@ -31,3 +31,9 @@ wp3_contagion/output/wp3_coauthor_network.csv
 wp3_contagion/output/wp3_citing_papers.csv
 wp3_contagion/output/wp3_author_trajectory.csv
 wp5_prediction/output/wp5_features.csv
+# Large intermediate data files
+**/output/merged_dataset.csv
+**/output/wp4_node_metrics.csv
+**/output/wp4_network_metrics.csv
+**/output/wp2_citation_long.csv
+**/output/wp5_features.csv

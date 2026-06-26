@@ -50,11 +50,11 @@ retraction-bibliometrics/
 ├── shared/                    # Shared utilities and data loaders
 │   └── utils.py
 ├── data_collection/           # Data fetching scripts (Crossref & OpenAlex)
-├── wp1_descriptive/           # WP1: Descriptive mapping and taxonomy
-├── wp2_citation_decay/        # WP2: Difference-in-differences event study
-├── wp3_contagion/             # WP3: Contagion proxy and co-author networks
-├── wp4_structural/            # WP4: Citation graph and structural metrics
-└── wp5_prediction/            # WP5: Machine learning early-warning models
+├── descriptive_statistics/           # WP1: Descriptive mapping and taxonomy
+├── citation_decay/        # WP2: Difference-in-differences event study
+├── contagion_analysis/             # WP3: Contagion proxy and co-author networks
+├── structural_network/            # WP4: Citation graph and structural metrics
+└── predictive_modelling/            # WP5: Machine learning early-warning models
 ```
 *(Note: Each WP directory contains a `scripts/` folder with the source code and an `output/` folder containing the generated figures and CSV results.)*
 
