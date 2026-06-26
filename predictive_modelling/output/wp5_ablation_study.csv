@@ -1,0 +1,8 @@
+model,accuracy,precision,recall,f1,roc_auc,log_loss,mcc,removed_feature
+All features,0.9085,0.9374,0.9529,0.9451,0.9308,0.2421,0.672,None (baseline)
+−Title Length,0.9093,0.9334,0.9586,0.9458,0.932,0.2377,0.6694,Title Length
+−log(Authors+1),0.9072,0.9362,0.9525,0.9443,0.9289,0.2443,0.6666,log(Authors+1)
+−log(Refs+1),0.8863,0.9319,0.9304,0.9311,0.9093,0.2726,0.6052,log(Refs+1)
+−Open Access,0.8828,0.9241,0.9349,0.9295,0.9077,0.2803,0.5829,Open Access
+−Has Abstract,0.8929,0.929,0.9424,0.9356,0.9222,0.2587,0.6171,Has Abstract
+−log(Early Velocity+1),0.9004,0.9335,0.9469,0.9402,0.9195,0.2555,0.644,log(Early Velocity+1)

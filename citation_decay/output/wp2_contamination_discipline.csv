@@ -1,0 +1,31 @@
+unit,n_papers,exposure,contamination,persistence_yrs,recovery_slope
+Notice,7530,0.7682,1.0,10,-0.0
+Medicine,5005,0.4754,1.0,10,-0.0
+Computer science,4503,0.3282,1.0,10,-0.0
+Biology,740,0.2974,1.0,10,-0.0
+Materials science,736,0.3062,1.0,10,-0.0
+Chemistry,516,0.3348,1.0,10,-0.0
+Psychology,407,0.3814,1.0,10,-0.0
+Gene knockdown,331,0.1866,1.0,10,-0.0
+Apoptosis,309,0.3053,1.0,10,-0.0
+microRNA,295,0.232,1.0,10,-0.0
+Mathematics,225,0.2442,1.0,10,-0.0
+Cancer research,218,0.1989,1.0,10,-0.0
+Publishing,217,0.388,1.0,10,-0.0
+PI3K/AKT/mTOR pathway,170,0.3245,1.0,10,-0.0
+Hepatocellular carcinoma,121,0.2893,1.0,10,-0.0
+Humanities,156,0.8108,1.0,10,-0.0
+Wnt signaling pathway,155,0.1869,1.0,10,-0.0
+Scientific publishing,129,0.504,1.0,10,-0.0
+Oncogene,142,0.1249,1.0,10,-0.0
+Artificial neural network,133,0.3777,1.0,10,-0.0
+Autophagy,143,0.1828,1.0,10,-0.0
+Business,142,0.3775,1.0,10,-0.0
+Downregulation and upregulation,158,0.1951,0.9,9,-0.05455
+Artificial intelligence,269,0.3168,0.8,8,-0.09697
+Tourism,158,0.4257,0.8,8,-0.09697
+China,153,0.2824,0.7,7,-0.12727
+Cloud computing,166,0.3863,0.6,6,-0.14545
+Coronavirus disease 2019 (COVID-19),150,0.3512,0.6,6,-0.14545
+Big data,209,0.3013,0.5,6,-0.13939
+Ideology,154,0.4029,0.4,4,-0.14545

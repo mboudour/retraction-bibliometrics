@@ -1,0 +1,5 @@
+metric,retracted_mean,retracted_ci_lo,retracted_ci_hi,non_retracted_mean,non_retracted_ci_lo,non_retracted_ci_hi,mw_u,p_value,rank_biserial_r
+betweenness,6e-06,1e-06,1.8e-05,0.0,0.0,1e-06,37196428790.0,0.0,-0.0024
+in_degree,0.382471,0.3258,0.385,1.306388,1.273792,1.3247,7418811471.0,0.0,0.8001
+out_degree,28.882591,28.018272,29.147758,0.0,0.0,0.0,70715741850.0,0.0,-0.9057
+pagerank,1e-06,1e-06,1e-06,1e-06,1e-06,1e-06,7541971861.0,0.0,0.7968

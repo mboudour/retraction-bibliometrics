@@ -1,0 +1,5 @@
+Indicator,Definition,Formula
+Exposure(U),Fraction of U's total citations that are post-retraction,"$\sum_{t>0} C(U,t) / \sum_t C(U,t)$"
+"Contamination(U,t)",Post-retraction citations received by U / all citations received by U at time t,"$C_{\mathrm{post}}(U,t) / C(U,t)$"
+Persistence(U),Latest year post-retraction with at least one citation from U,"$\max\{t > 0 : C(U,t) > 0\}$"
+Recovery(U),"Slope of linear fit on Contamination(U,t) for t > 0 (negative = recovering)","$\hat{\beta}_1$ from OLS on $\mathrm{CI}(U,t) = \beta_0 + \beta_1 t$"

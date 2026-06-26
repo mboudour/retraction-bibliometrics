@@ -1,0 +1,6 @@
+model,accuracy,precision,recall,f1,roc_auc,log_loss,mcc,train_discipline,n_train,n_test
+XGB train=Notice,0.7635,0.9672,0.7724,0.8589,0.7742,0.5418,0.2386,Notice,7530,50958
+XGB train=Medicine,0.8207,0.8282,0.9842,0.8995,0.8651,0.4591,0.1838,Medicine,5005,53483
+XGB train=Computer science,0.8279,0.8477,0.962,0.9013,0.8291,0.5364,0.2869,Computer science,4503,53985
+XGB train=Biology,0.827,0.8483,0.9622,0.9017,0.8134,0.5357,0.2374,Biology,740,57748
+XGB train=Materials science,0.8157,0.8575,0.9315,0.893,0.8074,0.5617,0.2503,Materials science,736,57752

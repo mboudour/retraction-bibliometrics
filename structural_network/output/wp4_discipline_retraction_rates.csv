@@ -1,0 +1,37 @@
+top_concept,non_retracted,retracted,total,retraction_rate
+Angiogenesis,0,105,105,1.0
+Apoptosis,0,309,309,1.0
+Artificial intelligence,0,269,269,1.0
+Artificial neural network,0,133,133,1.0
+Autophagy,0,143,143,1.0
+Big data,0,209,209,1.0
+Biology,0,739,739,1.0
+Business,0,142,142,1.0
+Cancer research,0,218,218,1.0
+Chemistry,0,516,516,1.0
+China,0,153,153,1.0
+Cloud computing,0,166,166,1.0
+Cluster analysis,0,104,104,1.0
+Computer science,0,4502,4502,1.0
+Coronavirus disease 2019 (COVID-19),0,150,150,1.0
+Downregulation and upregulation,0,158,158,1.0
+Gene knockdown,0,330,330,1.0
+Glioma,0,120,120,1.0
+Hepatocellular carcinoma,0,121,121,1.0
+Humanities,0,156,156,1.0
+Ideology,0,154,154,1.0
+Materials science,0,735,735,1.0
+Mathematics,0,225,225,1.0
+Medicine,0,5000,5000,1.0
+Notice,0,7530,7530,1.0
+Oncogene,0,142,142,1.0
+Osteosarcoma,0,112,112,1.0
+Oxidative stress,0,120,120,1.0
+PI3K/AKT/mTOR pathway,0,170,170,1.0
+PTEN,0,101,101,1.0
+Psychology,0,262,262,1.0
+Publishing,0,217,217,1.0
+Scientific publishing,0,129,129,1.0
+Tourism,0,158,158,1.0
+Wnt signaling pathway,0,155,155,1.0
+microRNA,0,295,295,1.0
