@@ -1,0 +1,7 @@
+priority,primary_category,description
+1,Paper Mill,Papers explicitly flagged as paper-mill related
+2,Misconduct/Fraud,Falsification fabrication fraud or formal misconduct findings
+3,Plagiarism/Duplication,Plagiarism duplication or duplicate publication
+4,Error/Unreliable Results,Errors unreliable results/data or non-reproducibility
+5,Publication Process/Editorial,Peer-review journal publisher editorial notice or process concerns
+6,Other/Unclear,Remaining reasons that cannot be placed in the preceding categories

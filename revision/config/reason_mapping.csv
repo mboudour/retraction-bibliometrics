@@ -1,0 +1,7 @@
+broad_category,pattern,mapping_rationale,active
+Paper Mill,paper mill,Direct Retraction Watch category or phrase,TRUE
+Misconduct/Fraud,falsification|fabrication|misconduct|fraud|image manipulation,Research-integrity misconduct reasons,TRUE
+Plagiarism/Duplication,plagiari|duplicate publication|duplication,Text/data plagiarism and duplicate-publication reasons,TRUE
+Error/Unreliable Results,error|unreliable|not reproducible|data reliability|concern.?data|concern.?results,Errors and unreliable-results reasons,TRUE
+Publisher/Editorial,publisher|editorial|withdrawal|withdrawn,Publisher/editorial actions and withdrawals,TRUE
+Other/Unclear,.*,Fallback for a reason with no earlier category match,TRUE
