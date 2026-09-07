@@ -93,8 +93,8 @@ No raw data are modified. No file is uploaded to GitHub by these scripts.
 Step 4 replaces the prior within-treated-paper comparison with an explicit,
 matched non-retracted control design. It uses the frozen `revision_master.csv.gz`
 from Step 1 as the treatment cohort and retrieves candidate non-retracted OpenAlex
-works matched exactly on **venue ISSN-L** and **publication year**. Within each
-venue-year stratum, it selects one nearest-neighbour control without replacement
+works matched exactly on **OpenAlex work type (article)**, **venue ISSN-L**, and
+**publication year**. Within each venue-year stratum, it selects one nearest-neighbour control without replacement
 on mean `log(1 + annual citations)` in the three years before the treated paper's
 retraction (`t=-3,-2,-1`). The matched control is assigned its treated paper's
 retraction year as a pseudo-event year.

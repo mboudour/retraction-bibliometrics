@@ -160,8 +160,9 @@ def infer_columns(df: pd.DataFrame) -> dict[str, str | None]:
         "journal": find_column(columns, ["journal_name", "Journal", "Title"]),
         "concept": find_column(columns, ["top_concept", "concepts_top", "primary_topic"]),
         "counts": find_column(columns, ["counts_by_year_json", "counts_by_year"]),
+        "work_type": find_column(columns, ["type", "work_type"]),
     }
-    missing = [key for key in ("oa_id", "pub_year", "ret_year", "issn_l", "counts") if not out[key]]
+    missing = [key for key in ("oa_id", "pub_year", "ret_year", "issn_l", "counts", "work_type") if not out[key]]
     if missing:
         raise ValueError(
             "The frozen master dataset lacks required columns: " + ", ".join(missing) +
@@ -183,14 +184,17 @@ def prepare_treated(master: pd.DataFrame, cols: dict[str, str | None], args: arg
     df["journal_match"] = df[cols["journal"]].fillna("").astype(str).str.strip() if cols["journal"] else ""
     df["concept_match"] = df[cols["concept"]].fillna("Unknown").astype(str).str.strip() if cols["concept"] else "Unknown"
     df["treated_counts"] = df[cols["counts"]].apply(parse_counts)
+    df["work_type_match"] = df[cols["work_type"]].fillna("").astype(str).str.strip().str.lower()
     df["paper_age_at_retraction"] = df["ret_year_match"] - df["pub_year_match"]
 
-    # A common three-year baseline is required for a valid matched DiD contrast.
+    # Restrict to research articles so treated and non-retracted controls share the OpenAlex type.
+    # A common three-year baseline is also required for a valid matched DiD contrast.
     eligible = df[
         df["treated_id"].ne("") &
         df["pub_year_match"].notna() &
         df["ret_year_match"].notna() &
         df["issn_l_match"].ne("") &
+        df["work_type_match"].eq("article") &
         (df["paper_age_at_retraction"] >= 3)
     ].copy()
     eligible["pub_year_match"] = eligible["pub_year_match"].astype(int)
@@ -707,7 +711,7 @@ def main() -> None:
         "design": {
             "treated_source": "revision_master.csv.gz",
             "control_source": "OpenAlex API, is_retracted:false",
-            "exact_matching": ["venue ISSN-L", "publication year"],
+            "exact_matching": ["OpenAlex work type (article)", "venue ISSN-L", "publication year"],
             "nearest_neighbour_variable": "mean log(1+annual citations) at event times -3,-2,-1",
             "matching_with_replacement": False,
             "baseline_caliper": args.baseline_caliper,
