@@ -16,6 +16,11 @@ Matching design
 * Each control receives the treated paper's retraction year as a pseudo-event
   year. This aligns treated and control papers by both publication cohort and
   calendar time.
+* Complete-window eligibility: the default design uses citation years 2016--2025
+  (the ten completed years represented by OpenAlex's recent `counts_by_year`
+  history as of 2026), five pre-event years, and four post-event years. This
+  produces two diagnostic pre-trend years before the three-year reference window
+  and avoids the incomplete current citation year.
 
 Estimator
 ---------
@@ -27,9 +32,9 @@ level for this one-observation-per-pair-per-event-time estimator.
 
 IMPORTANT: Citation counts at t=0 are calendar-year counts and may include both
 pre- and post-notice citations. The script reports them but does not interpret
-them as a clean post-retraction treatment effect. Effects are observational
-unless the matching balance and pre-trend diagnostics support a stronger
-interpretation.
+them as a clean post-notice effect. The estimates are conditional on the
+matched-control design and should be interpreted alongside matching balance,
+pre-trend, attrition, and right-censoring diagnostics.
 
 Run from the project root after Step 1:
     python revision/scripts/06_matched_event_study_did.py --mode all \
@@ -84,21 +89,25 @@ def parse_args() -> argparse.Namespace:
         description="Construct matched non-retracted controls and run event-time DiD."
     )
     parser.add_argument("--mode", choices=("fetch", "analyze", "all"), default="all",
-                        help="fetch controls only, analyze an existing cache, or do both.")
+                        help="fetch control metadata, analyze an existing cache, or do both.")
     parser.add_argument("--api-key", default=os.getenv("OPENALEX_API_KEY", ""),
                         help="OpenAlex API key; defaults to OPENALEX_API_KEY.")
     parser.add_argument("--email", default=os.getenv("OPENALEX_EMAIL", ""),
                         help="Contact email for OpenAlex polite-pool requests.")
-    parser.add_argument("--event-window", type=int, default=10,
-                        help="Symmetric event window in years (default: 10).")
+    parser.add_argument("--pre-window", type=int, default=5,
+                        help="Pre-event window in years (default: 5; t=-5,-4 are the diagnostic pre-trend years).")
+    parser.add_argument("--post-window", type=int, default=4,
+                        help="Post-event window in years (default: 4; avoids the incomplete current citation year).")
     parser.add_argument("--candidate-multiplier", type=int, default=3,
-                        help="Candidate controls requested per treated paper in each stratum.")
+                        help="Candidate controls requested per treated paper in each venue-year stratum.")
     parser.add_argument("--max-candidates-per-stratum", type=int, default=1000,
                         help="Hard API retrieval ceiling per venue-year stratum.")
     parser.add_argument("--baseline-caliper", type=float, default=1.00,
                         help="Maximum absolute difference in mean log(1+citations) at t=-3:-1.")
-    parser.add_argument("--as-of-year", type=int, default=date.today().year,
-                        help="Do not analyze event years after this calendar year.")
+    parser.add_argument("--as-of-year", type=int, default=date.today().year - 1,
+                        help="Last complete citation year (default: previous calendar year).")
+    parser.add_argument("--citation-history-start-year", type=int, default=None,
+                        help="First complete year covered by counts_by_year; default is as-of-year minus 9.")
     parser.add_argument("--sleep", type=float, default=0.12,
                         help="Seconds between API requests (default: 0.12).")
     parser.add_argument("--seed", type=int, default=20260907,
@@ -188,15 +197,19 @@ def prepare_treated(master: pd.DataFrame, cols: dict[str, str | None], args: arg
     df["paper_age_at_retraction"] = df["ret_year_match"] - df["pub_year_match"]
 
     # Restrict to research articles so treated and non-retracted controls share the OpenAlex type.
-    # A common three-year baseline is also required for a valid matched DiD contrast.
+    # Require a full symmetric event window and the three-year reference window.
     eligible = df[
         df["treated_id"].ne("") &
         df["pub_year_match"].notna() &
         df["ret_year_match"].notna() &
         df["issn_l_match"].ne("") &
         df["work_type_match"].eq("article") &
-        (df["paper_age_at_retraction"] >= 3)
+        (df["paper_age_at_retraction"] >= args.pre_window) &
+        (df["ret_year_match"] - args.pre_window >= citation_history_start_year(args)) &
+        (df["ret_year_match"] + args.post_window <= args.as_of_year)
     ].copy()
+    if eligible.empty:
+        return eligible
     eligible["pub_year_match"] = eligible["pub_year_match"].astype(int)
     eligible["ret_year_match"] = eligible["ret_year_match"].astype(int)
     eligible["paper_age_at_retraction"] = eligible["paper_age_at_retraction"].astype(int)
@@ -209,6 +222,10 @@ def prepare_treated(master: pd.DataFrame, cols: dict[str, str | None], args: arg
     if args.max_treated:
         eligible = eligible.head(args.max_treated).copy()
     return eligible
+
+
+def citation_history_start_year(args: argparse.Namespace) -> int:
+    return int(args.citation_history_start_year) if args.citation_history_start_year is not None else int(args.as_of_year - 9)
 
 
 def baseline_log_citations(counts: dict[int, int], event_year: int) -> float:
@@ -503,7 +520,12 @@ def make_balance_table(pairs: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def build_event_estimates(pairs: pd.DataFrame, event_window: int, as_of_year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+def build_event_estimates(
+    pairs: pd.DataFrame,
+    pre_window: int,
+    post_window: int,
+    as_of_year: int,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     rows: list[dict[str, Any]] = []
     pair_pretrend: list[dict[str, Any]] = []
     for _, pair in pairs.iterrows():
@@ -521,7 +543,7 @@ def build_event_estimates(pairs: pd.DataFrame, event_window: int, as_of_year: in
             continue
         baseline = float(np.mean(baseline_diffs))
         pre_rows: list[tuple[int, float]] = []
-        for tau in range(-event_window, event_window + 1):
+        for tau in range(-pre_window, post_window + 1):
             calendar_year = event_year + tau
             if calendar_year < pub_year or calendar_year > as_of_year:
                 continue
@@ -697,7 +719,7 @@ def main() -> None:
     balance.to_csv(output_dir / "step4_matching_balance.csv", index=False)
 
     print("Estimating event-time matched-pair DiD contrasts …")
-    panel, estimates = build_event_estimates(pairs, args.event_window, args.as_of_year)
+    panel, estimates = build_event_estimates(pairs, args.pre_window, args.post_window, args.as_of_year)
     if estimates.empty:
         raise RuntimeError("No event-study estimates were produced from the matched pairs.")
     panel.to_csv(output_dir / "step4_matched_event_panel.csv", index=False)
@@ -715,7 +737,8 @@ def main() -> None:
             "nearest_neighbour_variable": "mean log(1+annual citations) at event times -3,-2,-1",
             "matching_with_replacement": False,
             "baseline_caliper": args.baseline_caliper,
-            "event_window": [-args.event_window, args.event_window],
+            "event_window": [-args.pre_window, args.post_window],
+            "citation_history_start_year": citation_history_start_year(args),
             "as_of_year": args.as_of_year,
             "outcome": "log(1 + annual citations)",
         },

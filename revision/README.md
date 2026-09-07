@@ -97,7 +97,11 @@ works matched exactly on **OpenAlex work type (article)**, **venue ISSN-L**, and
 **publication year**. Within each venue-year stratum, it selects one nearest-neighbour control without replacement
 on mean `log(1 + annual citations)` in the three years before the treated paper's
 retraction (`t=-3,-2,-1`). The matched control is assigned its treated paper's
-retraction year as a pseudo-event year.
+retraction year as a pseudo-event year. The default event window is five years
+before and four years after the event. It uses only records whose entire
+2016--2025 window is observed in OpenAlex's recent annual citation history,
+which preserves two pre-trend years ($t=-5,-4$) before the three-year reference
+period ($t=-3,-2,-1$).
 
 Run it from the project root:
 
