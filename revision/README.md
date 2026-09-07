@@ -87,3 +87,49 @@ revision/output/consistency_audit.csv
 Do **not** use the previous `fig_retraction_reasons_multilabel.*` as manuscript Figure 4. Keep it only as a diagnostic/supplementary product if useful.
 
 No raw data are modified. No file is uploaded to GitHub by these scripts.
+
+## Step 4 — matched-control citation event study
+
+Step 4 replaces the prior within-treated-paper comparison with an explicit,
+matched non-retracted control design. It uses the frozen `revision_master.csv.gz`
+from Step 1 as the treatment cohort and retrieves candidate non-retracted OpenAlex
+works matched exactly on **venue ISSN-L** and **publication year**. Within each
+venue-year stratum, it selects one nearest-neighbour control without replacement
+on mean `log(1 + annual citations)` in the three years before the treated paper's
+retraction (`t=-3,-2,-1`). The matched control is assigned its treated paper's
+retraction year as a pseudo-event year.
+
+Run it from the project root:
+
+```bash
+python revision/scripts/run_step_04.py --api-key "$OPENALEX_API_KEY" \
+  --email "your.email@university.edu"
+```
+
+The first full run fetches and caches candidate controls in
+`revision/data/step4_nonretracted_control_cache.jsonl`; it may take considerable
+time and can be safely rerun. Once the cache exists, run the analysis alone:
+
+```bash
+python revision/scripts/run_step_04.py --mode analyze
+```
+
+Do not use `--max-treated` for final results; it is only for a small local test.
+
+The final analysis outputs are written to `revision/output/`:
+
+- `step4_matched_event_study_summary.json` — analysis manifest and pre-trend test;
+- `step4_treated_eligibility.csv` and `step4_unmatched_treated.csv` — cohort and
+  matching-attrition audit;
+- `step4_matching_balance.csv` — exact-match and baseline-citation balance;
+- `step4_matched_event_study_estimates.csv` — coefficient, pair-clustered SE,
+  95% CI, p-value, and matched-pair count at each event time;
+- `fig_step4_matched_event_study.png` and `.pdf` — replacement event-study figure;
+- `table_step4_matching_balance.tex` and `table_step4_event_study.tex` —
+  submission-ready tables.
+
+The retraction-year (`t=0`) estimate is reported but must not be interpreted as a
+clean post-notice effect because annual OpenAlex citation counts cannot separate
+citations made before and after the precise retraction date. Interpret all results
+in light of the matching balance, pre-trend diagnostic, cohort attrition, and
+right-censoring.
