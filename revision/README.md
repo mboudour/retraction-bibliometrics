@@ -187,3 +187,52 @@ fig_step5_indicator_ranking_stability.png
 Do not report indicator values until inspecting the eligibility and global
 sensitivity outputs. The common-follow-up restriction can materially change the
 eligible cohort as $H$ increases.
+
+
+## Step 6 — Balanced citation-network reconstruction and robustness diagnostics
+
+Run from the project root after the completed Step 4 matched-control analysis:
+
+```bash
+export OPENALEX_API_KEY="$(cat openalex_api_key.txt)"
+python revision/scripts/run_step_06.py \
+  --mode all \
+  --api-key "$OPENALEX_API_KEY" \
+  --email "moses.boudourides@northwestern.edu"
+```
+
+The script uses the Step 4 matched pairs as a balanced focal design: each
+retracted article and its matched non-retracted control is a focal paper. For
+every focal paper, it retrieves a reproducible sample of up to 30 citing works
+and up to 30 outgoing references. The selected citing works contribute their own
+sampled outgoing references. Therefore, the reconstructed directed graph includes
+retracted-to-non-retracted, non-retracted-to-retracted, and context-to-context
+citation edges, unlike the earlier retraction-centered reference graph.
+
+This is a **sampled one-hop neighbourhood reconstruction**, not the entire
+OpenAlex graph. It has explicit caps and omits citation edges among context works
+that are not selected citing neighbours. The output diagnostics report the precise
+network size, fetch success, edge-type composition, retained/API-reported
+neighbour counts, and the context-to-context edge share. The script also runs a
+focal-label permutation design check for directed betweenness; that check is
+unadjusted and is not the primary H1/H2 inference, which follows in Step 7.
+
+The cache `revision/data/step6_focal_neighborhoods.jsonl` permits an interrupted
+fetch to resume. Use `--mode analyze` to recompute outputs from a completed cache
+without API calls. Use `--force-refetch` only to deliberately replace all cached
+neighbourhood records.
+
+Key outputs in `revision/output/`:
+
+```text
+step6_expanded_network_summary.json
+step6_neighborhood_fetch_audit.csv
+step6_edge_type_composition.csv
+step6_node_type_composition.csv
+step6_focal_node_metrics.csv
+step6_label_permutation_null.csv
+step6_expanded_network_edges.csv.gz
+step6_expanded_network_nodes.csv.gz
+fig_step6_edge_composition.png
+fig_step6_label_permutation.png
+```
