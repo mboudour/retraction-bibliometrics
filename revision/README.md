@@ -142,3 +142,48 @@ clean post-notice effect because annual OpenAlex citation counts cannot separate
 citations made before and after the precise retraction date. Interpret all results
 in light of the matching balance, pre-trend diagnostic, cohort attrition, and
 right-censoring.
+
+
+## Step 5 — Sensitivity analysis for post-retraction citation-persistence indicators
+
+Run from the project root after Step 1:
+
+```bash
+python revision/scripts/run_step_05.py
+```
+
+This calculation uses only the frozen Step 1 corpus and makes no network or API
+requests. It recalculates the four indicator-family measures using **common
+symmetric follow-up windows** of $H=1,2,3,4$ years. A paper contributes to a
+specific $H$ only if annual OpenAlex citation counts are observable from
+$r_p-H$ through $r_p+H$, avoiding the unequal follow-up time that otherwise
+advantages older retractions. The script also varies the minimum scholarly-unit
+size (10, 30, and 50 papers) and the minimum event-time citation denominator
+(1 and 10 citations).
+
+The reference specification is $H=4$, at least 30 papers per unit, and a minimum
+event-time denominator of 10 citations. It outputs the global indicator
+sensitivity, unit-level estimates for every specification, cohort eligibility,
+rank-stability statistics, two LaTeX tables, and two figures. The definitions
+are window-specific: Exposure is the pooled post-event citation share over the
+common window; Contamination is the mean post-versus-pre event-time ratio;
+Persistence is the last event year with any post-event citation; and Recovery is
+the OLS slope of that ratio on event time.
+
+Key outputs in `revision/output/`:
+
+```text
+step5_indicator_sensitivity_manifest.json
+step5_indicator_global_sensitivity.csv
+step5_indicator_eligibility.csv
+step5_indicator_estimates_long.csv
+step5_indicator_ranking_stability.csv
+table_step5_indicator_sensitivity.tex
+table_step5_indicator_stability.tex
+fig_step5_indicator_window_sensitivity.png
+fig_step5_indicator_ranking_stability.png
+```
+
+Do not report indicator values until inspecting the eligibility and global
+sensitivity outputs. The common-follow-up restriction can materially change the
+eligible cohort as $H$ increases.
