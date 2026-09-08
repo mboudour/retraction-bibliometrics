@@ -1,6 +1,8 @@
 """
 Contamination Indicator Family — WP2 Extension
 ================================================
+DEPRECATED FOR THE REVISION (Step 5). This exploratory one-shot script does not apply common follow-up windows or right-censoring restrictions and should not be used to generate revised-manuscript results. Use `revision/scripts/07_indicator_sensitivity.py` instead.
+
 Defines and computes four bibliometric indicators for scholarly units U:
 
   Exposure(U)     = fraction of U's outgoing citations pointing to
