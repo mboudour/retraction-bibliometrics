@@ -98,12 +98,16 @@ def parse_args() -> argparse.Namespace:
                         help="Pre-event window in years (default: 5; t=-5,-4 are the diagnostic pre-trend years).")
     parser.add_argument("--post-window", type=int, default=4,
                         help="Post-event window in years (default: 4; avoids the incomplete current citation year).")
-    parser.add_argument("--candidate-multiplier", type=int, default=3,
-                        help="Candidate controls requested per treated paper in each venue-year stratum.")
+    parser.add_argument("--candidate-multiplier", type=int, default=50,
+                        help="Random candidate controls requested per treated paper in each venue-year stratum.")
+    parser.add_argument("--min-candidates-per-stratum", type=int, default=100,
+                        help="Minimum random control candidates retrieved per venue-year stratum.")
     parser.add_argument("--max-candidates-per-stratum", type=int, default=1000,
-                        help="Hard API retrieval ceiling per venue-year stratum.")
-    parser.add_argument("--baseline-caliper", type=float, default=1.00,
-                        help="Maximum absolute difference in mean log(1+citations) at t=-3:-1.")
+                        help="Hard random-sample retrieval ceiling per venue-year stratum.")
+    parser.add_argument("--baseline-caliper", type=float, default=0.10,
+                        help="Maximum absolute difference in mean log(1+citations) at t=-3:-1 (default: 0.10).")
+    parser.add_argument("--balance-threshold", type=float, default=0.10,
+                        help="Absolute standardized mean-difference threshold required for the baseline citation covariate.")
     parser.add_argument("--as-of-year", type=int, default=date.today().year - 1,
                         help="Last complete citation year (default: previous calendar year).")
     parser.add_argument("--citation-history-start-year", type=int, default=None,
@@ -334,10 +338,12 @@ def fetch_controls(
     with control_cache.open("a", encoding="utf-8") as fout:
         for number, ((issn_l, pub_year), group) in enumerate(grouped, start=1):
             stratum = f"{issn_l}|{int(pub_year)}"
-            desired = min(args.max_candidates_per_stratum,
-                          max(10, len(group) * args.candidate_multiplier))
+            desired = min(
+                args.max_candidates_per_stratum,
+                max(args.min_candidates_per_stratum, len(group) * args.candidate_multiplier),
+            )
             existing = cache.get((issn_l, int(pub_year)), [])
-            if stratum in completed and len(existing) >= min(desired, 10):
+            if stratum in completed and len(existing) >= desired:
                 continue
 
             source_id = source_id_map.get(str(issn_l))
@@ -369,37 +375,33 @@ def fetch_controls(
                 )
                 continue
 
-            candidates: list[dict[str, Any]] = []
-            cursor = "*"
-            while len(candidates) < desired and cursor:
-                params: dict[str, Any] = {
-                    "filter": (
-                        f"is_retracted:false,type:article,has_doi:true,"
-                        f"publication_year:{int(pub_year)},"
-                        f"primary_location.source.id:{source_id}"
-                    ),
-                    "select": select,
-                    "per-page": min(200, desired - len(candidates)),
-                    "cursor": cursor,
-                }
-                if args.api_key:
-                    params["api_key"] = args.api_key
-                else:
-                    params["mailto"] = args.email
-                data = request_json(session, params)
-                page = data.get("results", [])
-                if not page:
-                    break
-                for raw in page:
-                    item = extract_control_record(raw)
-                    if not item:
-                        continue
-                    if item["control_id"] in treated_ids or item["control_doi"] in treated_dois:
-                        continue
-                    candidates.append(raw)
-                    fout.write(json.dumps(raw, ensure_ascii=False) + "\n")
-                cursor = (data.get("meta") or {}).get("next_cursor")
-                time.sleep(args.sleep)
+            # Cursor pagination returns a systematic first-page slice. Use OpenAlex's
+            # reproducible random sample endpoint instead, so the control pool is not
+            # dominated by the API's default result ordering.
+            stable_seed = int(hashlib.sha256(stratum.encode("utf-8")).hexdigest()[:8], 16)
+            params: dict[str, Any] = {
+                "filter": (
+                    f"is_retracted:false,type:article,has_doi:true,"
+                    f"publication_year:{int(pub_year)},"
+                    f"primary_location.source.id:{source_id}"
+                ),
+                "select": select,
+                "sample": desired,
+                "seed": stable_seed,
+            }
+            if args.api_key:
+                params["api_key"] = args.api_key
+            else:
+                params["mailto"] = args.email
+            data = request_json(session, params)
+            for raw in data.get("results", []):
+                item = extract_control_record(raw)
+                if not item:
+                    continue
+                if item["control_id"] in treated_ids or item["control_doi"] in treated_dois:
+                    continue
+                fout.write(json.dumps(raw, ensure_ascii=False) + "\n")
+            time.sleep(args.sleep)
 
             # Reload only the new stratum in a simple robust way; the cache remains the source of truth.
             cache = load_control_cache(control_cache)
@@ -426,9 +428,19 @@ def greedy_match(
     for (issn_l, pub_year), group in treated.groupby(["issn_l_match", "pub_year_match"], sort=True):
         pool = candidates.get((str(issn_l), int(pub_year)), [])
         available = {item["control_id"]: item for item in pool}
-        # Treat papers with the least common baseline profiles first.
-        work = group.sample(frac=1.0, random_state=int(rng.integers(1, 2**31 - 1)))
-        for _, row in work.iterrows():
+        # Match papers with the fewest admissible candidates first to minimize
+        # avoidable attrition under one-to-one matching without replacement.
+        ranked: list[tuple[int, float, str, pd.Series]] = []
+        for _, row in group.iterrows():
+            event_year = int(row["ret_year_match"])
+            t_base = float(row["baseline_log_cites"])
+            n_admissible = sum(
+                abs(t_base - baseline_log_citations(control["control_counts"], event_year)) <= caliper
+                for control in available.values()
+            )
+            ranked.append((n_admissible, t_base, str(row["treated_id"]), row))
+        ranked.sort(key=lambda item: (item[0], item[1], item[2]))
+        for _, _, _, row in ranked:
             event_year = int(row["ret_year_match"])
             t_base = float(row["baseline_log_cites"])
             scored: list[tuple[float, float, dict[str, Any]]] = []
@@ -683,8 +695,10 @@ def main() -> None:
     dirs = revision_dirs(root)
     output_dir = dirs["output"]
     data_dir = dirs["data"]
-    cache_path = data_dir / "step4_nonretracted_control_cache.jsonl"
-    progress_path = data_dir / "step4_control_fetch_progress.json"
+    # v2 cache: old cache was generated from a deterministic first-page API slice
+    # and must not be reused for the balanced design.
+    cache_path = data_dir / "step4_nonretracted_control_cache_v2.jsonl"
+    progress_path = data_dir / "step4_control_fetch_progress_v2.json"
     source_id_map_path = data_dir / "step4_issn_to_openalex_source_id.json"
 
     print("Loading frozen Step 1 master corpus …")
@@ -717,6 +731,19 @@ def main() -> None:
 
     balance = make_balance_table(pairs)
     balance.to_csv(output_dir / "step4_matching_balance.csv", index=False)
+    baseline_smd = float(
+        balance.loc[
+            balance["variable"].eq("Mean log(1 + citations), t=-3:-1"),
+            "standardized_mean_difference",
+        ].iloc[0]
+    )
+    if not np.isfinite(baseline_smd) or abs(baseline_smd) > args.balance_threshold:
+        raise RuntimeError(
+            "Matching balance failed: the baseline-citation standardized mean difference is "
+            f"{baseline_smd:.3f}, exceeding the prespecified absolute threshold of "
+            f"{args.balance_threshold:.3f}. Do not interpret or report this event study. "
+            "Increase the random candidate pool and/or reduce --baseline-caliper, then rerun."
+        )
 
     print("Estimating event-time matched-pair DiD contrasts …")
     panel, estimates = build_event_estimates(pairs, args.pre_window, args.post_window, args.as_of_year)
@@ -737,6 +764,7 @@ def main() -> None:
             "nearest_neighbour_variable": "mean log(1+annual citations) at event times -3,-2,-1",
             "matching_with_replacement": False,
             "baseline_caliper": args.baseline_caliper,
+            "balance_threshold": args.balance_threshold,
             "event_window": [-args.pre_window, args.post_window],
             "citation_history_start_year": citation_history_start_year(args),
             "as_of_year": args.as_of_year,
