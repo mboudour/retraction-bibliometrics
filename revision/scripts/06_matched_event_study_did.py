@@ -612,6 +612,39 @@ def build_event_estimates(
         })
     pretrend = pd.DataFrame(pair_pretrend)
     estimates_df = pd.DataFrame(estimates)
+
+    # Formal joint test of the event-study coefficients preceding the three-year
+    # reference window. It tests H0: beta_{-5}=beta_{-4}=0 using the matched-pair
+    # covariance matrix, rather than relying only on separate pointwise tests.
+    pre_reference_times = sorted(tau for tau in panel["event_time"].unique() if tau < min(BASELINE_TIMES))
+    joint_pretrend: dict[str, Any] = {
+        "event_times": pre_reference_times,
+        "n_pairs": 0,
+        "wald_chi_square": np.nan,
+        "degrees_of_freedom": 0,
+        "p_value": np.nan,
+    }
+    if pre_reference_times:
+        wide = (
+            panel[panel["event_time"].isin(pre_reference_times)]
+            .pivot(index="pair_id", columns="event_time", values="did_pair_contrast")
+            .dropna()
+        )
+        if len(wide) > len(pre_reference_times):
+            mu = wide.to_numpy(dtype=float).mean(axis=0)
+            covariance_of_mean = np.cov(wide.to_numpy(dtype=float), rowvar=False, ddof=1) / len(wide)
+            if len(pre_reference_times) == 1:
+                covariance_of_mean = np.array([[float(covariance_of_mean)]])
+            wald = float(mu.T @ np.linalg.pinv(covariance_of_mean) @ mu)
+            joint_pretrend = {
+                "event_times": [int(t) for t in pre_reference_times],
+                "n_pairs": int(len(wide)),
+                "wald_chi_square": wald,
+                "degrees_of_freedom": int(len(pre_reference_times)),
+                "p_value": float(stats.chi2.sf(wald, df=len(pre_reference_times))),
+            }
+    estimates_df.attrs["joint_pretrend"] = joint_pretrend
+
     if not pretrend.empty and len(pretrend) > 1:
         result = stats.ttest_1samp(pretrend["pretrend_slope"], popmean=0.0, nan_policy="omit")
         estimates_df.attrs["pretrend"] = {
@@ -776,6 +809,7 @@ def main() -> None:
         "n_unmatched_eligible_treated": int(len(unmatched)),
         "matching_rate": float(len(pairs) / len(treated)),
         "pretrend_slope_test": pretrend,
+        "joint_pretrend_test": estimates.attrs.get("joint_pretrend", {}),
         "outputs": {
             "pairs": "step4_matched_pairs.csv",
             "unmatched": "step4_unmatched_treated.csv",
