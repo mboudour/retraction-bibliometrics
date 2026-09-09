@@ -267,3 +267,26 @@ Outputs include `step7_h1_summary.json`, a complete inference table, model
 coefficients, pair-level data, a manuscript-ready LaTeX table, and a two-panel
 matched-comparison figure. Holm-adjusted p-values are reported across the four
 confirmatory/secondary H1 tests. No API call is made.
+
+
+## Step 8 — Direct test of H2 (brokerage and post-retraction citation persistence)
+
+Run after Step 6:
+
+```bash
+python revision/scripts/run_step_08.py
+```
+
+The script narrows H2 to an observable associational claim: among retracted
+papers, is higher pre-retraction local focal-path brokerage associated with
+greater post-retraction citation persistence? It recalculates a time-respecting
+brokerage count using only selected citing works published before each focal
+paper's retraction year. The primary outcome is `log(1 + post-retraction
+citations)` in a common four-year follow-up window. The adjusted OLS model
+controls for pre-retraction citations and paper age at retraction, with HC3
+standard errors. Spearman rank association is tested by label permutation and
+bootstrapped confidence intervals. The script also reports H=1--4 sensitivity.
+
+The analysis does not measure citation stance, knowledge transmission, or
+multi-step propagation through the literature. Interpret results as associations
+within the sampled one-hop citation neighbourhood.
