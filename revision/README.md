@@ -290,3 +290,33 @@ bootstrapped confidence intervals. The script also reports H=1--4 sensitivity.
 The analysis does not measure citation stance, knowledge transmission, or
 multi-step propagation through the literature. Interpret results as associations
 within the sampled one-hop citation neighbourhood.
+
+
+## Step 9 — Complete predictive-model evaluation
+
+Run from the project root after Step 1:
+
+```bash
+export OPENALEX_API_KEY="$(cat openalex_api_key.txt)"
+python revision/scripts/run_step_09.py --mode all --api-key "$OPENALEX_API_KEY" --email "your.email@institution.edu"
+```
+
+The first run creates a cached sample of non-retracted OpenAlex research articles
+in `revision/data/step9_nonretracted_candidate_cache.jsonl`. It is resumable. The
+analysis selects one control per retracted paper without replacement, prioritizing
+exact publication-year and broad-field matches; the match level is recorded in
+`step9_control_matching_audit.csv`.
+
+Two feature sets are reported separately: **at-publication** (title length,
+author count, reference count, open-access status, and abstract availability) and
+**one-year early warning** (the same variables plus citations in the first full
+year after publication). The latter is explicitly post-publication. Publication
+year, total citations, retraction variables, author-retraction histories, and
+network variables are excluded.
+
+Four prespecified classifiers (logistic regression, random forest, gradient
+boosting, and RBF SVM) are evaluated under random 80/20, temporal, and
+cross-disciplinary validation. Output includes accuracy, precision, recall, F1,
+ROC-AUC, PR-AUC, log loss, MCC, Brier score, 10-bin ECE, confusion-matrix
+counts, calibration-bin data, and relative permutation importance. The analyses
+are retrospective; they are not a deployment-ready retraction-screening system.
