@@ -8,11 +8,10 @@ This script consumes the balanced 462-pair design from Step 4 and focal-path
 brokerage measures computed in Step 6. Its primary outcome is log(1 + the
 unnormalized focal-path brokerage count). The primary inferential analysis is
 paired: retracted minus matched-control within each pair. The adjusted analysis
-regresses the within-pair brokerage difference on residual baseline-citation
-difference, discipline mismatch, and treatment-paper field indicators. Journal,
-publication year, article type, and paper age at the pseudo-event are exact
-matching variables and therefore are not separately re-estimated in the
-difference regression.
+uses individual-paper regression with matched-pair fixed effects and the
+individual pre-event citation baseline. Journal, publication year, article type,
+paper age at the pseudo-event, and the journal's disciplinary context are
+absorbed by the exact pair matching and pair fixed effects.
 
 No API calls are made. Run from the project root:
     python revision/scripts/09_test_h1_boundary_positioning.py
@@ -42,7 +41,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bootstrap", type=int, default=5000, help="Matched-pair bootstrap replications (default: 5000).")
     parser.add_argument("--permutations", type=int, default=10000, help="Paired sign-flip permutations for mean contrast (default: 10000).")
     parser.add_argument("--seed", type=int, default=20260909, help="Random seed (default: 20260909).")
-    parser.add_argument("--min-field-n", type=int, default=10, help="Minimum treated-paper count for a separate field indicator (default: 10).")
     return parser.parse_args()
 
 
@@ -194,12 +192,12 @@ def make_pair_data(output_dir: Path, data_dir: Path) -> pd.DataFrame:
     return data.replace([np.inf, -np.inf], np.nan).dropna(subset=["log_brokerage_difference", "baseline_citation_difference"]).copy()
 
 
-def adjusted_model(data: pd.DataFrame, min_field_n: int) -> tuple[pd.DataFrame, dict[str, Any], dict[str, float]]:
+def adjusted_model(data: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any], dict[str, float]]:
     """Estimate an individual-paper model with matched-pair fixed effects.
 
-    Pair effects absorb the exact matching variables (article type, journal,
-    publication year, and pseudo-event age). Individual pre-event citation level
-    and a treatment-by-topic-mismatch term remain estimable within pair.
+    Pair effects absorb article type, journal, publication year, pseudo-event
+    age, and journal-level disciplinary context. The individual pre-event
+    citation baseline remains estimable within pair.
     """
     rows: list[dict[str, Any]] = []
     for _, row in data.iterrows():
@@ -208,13 +206,11 @@ def adjusted_model(data: pd.DataFrame, min_field_n: int) -> tuple[pd.DataFrame, 
                 "pair_id": row["pair_id"], "treatment": 1.0,
                 "log_brokerage": row["log_treated_brokerage"],
                 "baseline_cites": row["treated_baseline_log_cites"],
-                "topic_mismatch_treated": float(row["discipline_mismatch"]),
             },
             {
                 "pair_id": row["pair_id"], "treatment": 0.0,
                 "log_brokerage": row["log_control_brokerage"],
                 "baseline_cites": row["control_baseline_log_cites"],
-                "topic_mismatch_treated": 0.0,
             },
         ])
     long = pd.DataFrame(rows).replace([np.inf, -np.inf], np.nan).dropna()
@@ -223,18 +219,14 @@ def adjusted_model(data: pd.DataFrame, min_field_n: int) -> tuple[pd.DataFrame, 
         pd.Series(1.0, index=long.index, name="Intercept"),
         long["treatment"].rename("Retracted paper"),
         long["baseline_cites"].rename("Individual pre-event baseline citations"),
-        long["topic_mismatch_treated"].rename("Retracted paper x topic mismatch"),
         pair_dummies,
     ], axis=1)
     result, covariance = cluster_ols(
         long["log_brokerage"].to_numpy(float), x.to_numpy(float), long["pair_id"].to_numpy(), x.columns.tolist()
     )
     treatment_index = x.columns.get_loc("Retracted paper")
-    mismatch_index = x.columns.get_loc("Retracted paper x topic mismatch")
-    mismatch_rate = float(data["discipline_mismatch"].mean())
     weight = np.zeros(x.shape[1], dtype=float)
     weight[treatment_index] = 1.0
-    weight[mismatch_index] = mismatch_rate
     average_effect = float(weight @ result["coefficient"].to_numpy(float))
     average_se = float(np.sqrt(max(0.0, weight @ covariance @ weight)))
     df = max(1, long["pair_id"].nunique() - 1)
@@ -248,14 +240,13 @@ def adjusted_model(data: pd.DataFrame, min_field_n: int) -> tuple[pd.DataFrame, 
         "ci_95_upper": average_effect + crit * average_se,
         "t_statistic": t_value,
         "p_value": p_value,
-        "topic_mismatch_rate": mismatch_rate,
     }
     meta = {
         "n_pairs": int(long["pair_id"].nunique()),
         "n_observations": int(len(long)),
         "pair_fixed_effects": int(pair_dummies.shape[1]),
         "exact_matching_controls": ["article type", "journal ISSN-L", "publication year", "paper age at pseudo-event"],
-        "within_pair_covariates": ["individual pre-event baseline citation level", "retracted-paper x topic-mismatch indicator"],
+        "within_pair_covariates": ["individual pre-event baseline citation level"],
         "inference": "standard errors clustered by matched pair",
     }
     return result, meta, effect
@@ -276,7 +267,7 @@ def make_inference(data: pd.DataFrame, args: argparse.Namespace) -> tuple[pd.Dat
     b = int(((data["treated_any_brokerage"] == 1) & (data["control_any_brokerage"] == 0)).sum())
     c = int(((data["treated_any_brokerage"] == 0) & (data["control_any_brokerage"] == 1)).sum())
     odds_ratio, mcnemar_p = mcnemar_exact(b, c)
-    adjusted, model_meta, adjusted_effect = adjusted_model(data, args.min_field_n)
+    adjusted, model_meta, adjusted_effect = adjusted_model(data)
     raw_p = {
         "Primary paired mean difference (sign-flip permutation)": permutation_p,
         "Secondary paired rank test (Wilcoxon)": wilcoxon_p,
@@ -316,7 +307,7 @@ def make_inference(data: pd.DataFrame, args: argparse.Namespace) -> tuple[pd.Dat
             "p_value": float(adjusted_effect["p_value"]),
             "holm_adjusted_p_value": adjusted_p["Adjusted treatment effect (pair-fixed-effects OLS)"],
             "n_pairs": int(model_meta["n_pairs"]),
-            "note": "Pair fixed effects; pair-clustered standard errors; adjusted for individual pre-event citations and retracted-paper x topic-mismatch indicator",
+            "note": "Pair fixed effects; pair-clustered standard errors; adjusted for individual pre-event citations. Pair effects absorb journal-level disciplinary context.",
         },
     ]
     summary = {
@@ -409,7 +400,6 @@ def main() -> None:
         "created_at": now_utc(),
         "bootstrap_replications": args.bootstrap,
         "sign_flip_permutations": args.permutations,
-        "field_minimum_count": args.min_field_n,
         "outputs": [
             "step7_h1_pair_level.csv", "step7_h1_inference.csv", "step7_h1_adjusted_regression.csv",
             "table_step7_h1_boundary.tex", "fig_step7_h1_boundary_positioning.png/.pdf",
