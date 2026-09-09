@@ -76,7 +76,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-inbound-citers", type=int, default=30,
                         help="Maximum reproducibly sampled citing works retrieved per focal paper (default: 30).")
     parser.add_argument("--betweenness-k", type=int, default=200,
-                        help="Number of sampled source nodes for approximate directed betweenness (default: 200).")
+                        help="Number of sampled citing-source nodes for source-target directed betweenness (default: 200).")
     parser.add_argument("--permutations", type=int, default=1000,
                         help="Number of focal-label permutations for the design check (default: 1000).")
     parser.add_argument("--seed", type=int, default=20260908, help="Master random seed (default: 20260908).")
@@ -332,7 +332,10 @@ def build_graph(
             graph.add_edge(citer_id, focal_id, edge_origin="inbound_to_focal")
             for target in citer.get("referenced_works", []):
                 target_id = oa_id(target)
-                if target_id:
+                # The direct citer -> focal edge is already retained above as
+                # inbound_to_focal. Do not overwrite its provenance when the
+                # focal paper also appears in the full reference list.
+                if target_id and target_id != focal_id:
                     graph.add_edge(citer_id, target_id, edge_origin="inbound_outbound")
 
     node_rows: list[dict[str, Any]] = []
@@ -364,15 +367,40 @@ def build_graph(
     return graph, nodes, edges, audit
 
 
-def approximate_metrics(graph: nx.DiGraph, node_table: pd.DataFrame, args: argparse.Namespace) -> pd.DataFrame:
+def approximate_metrics(
+    graph: nx.DiGraph,
+    node_table: pd.DataFrame,
+    edge_table: pd.DataFrame,
+    args: argparse.Namespace,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
     print(f"Computing metrics on {graph.number_of_nodes():,} nodes and {graph.number_of_edges():,} edges …")
     n = graph.number_of_nodes()
     if n == 0:
         raise RuntimeError("The reconstructed graph has no nodes.")
     pagerank = nx.pagerank(graph, alpha=0.85, max_iter=200, tol=1e-7)
-    k = min(args.betweenness_k, n)
-    print(f"Computing approximate directed betweenness with k={k:,} sampled source nodes …")
-    betweenness = nx.betweenness_centrality(graph, k=k, normalized=True, seed=args.seed) if n > 1 else {next(iter(graph.nodes)): 0.0}
+
+    # Generic random-source betweenness almost never places a focal paper on a
+    # sampled directed shortest path in a large one-hop graph. Instead, compute
+    # source-target betweenness on paths from sampled works that cite a focal
+    # paper to works cited by that focal paper. This operationalizes the focal
+    # paper as a possible directed bridge between its local citing and cited
+    # neighbourhoods while retaining the full reconstructed graph for paths.
+    source_pool = edge_table.loc[edge_table["edge_origin"].eq("inbound_to_focal"), "source"].astype(str).tolist()
+    target_pool = edge_table.loc[edge_table["edge_origin"].eq("focal_outbound"), "target"].astype(str).tolist()
+    sources = seeded_subset(source_pool, min(args.betweenness_k, len(set(source_pool))), args.seed, "path_sources")
+    targets = sorted(set(target_pool))
+    if not sources or not targets:
+        raise RuntimeError("The reconstructed network lacks the citing-source or focal-reference target sets required for focal-path betweenness.")
+    print(f"Computing source-target directed betweenness with {len(sources):,} citing sources and {len(targets):,} focal-reference targets …")
+    betweenness = nx.betweenness_centrality_subset(graph, sources=sources, targets=targets, normalized=True)
+    metric_meta = {
+        "definition": "Approximate normalized directed source-target betweenness centrality.",
+        "source_set": "Reproducibly sampled works with an observed citation to a focal retracted or matched-control paper.",
+        "target_set": "All retained references of focal retracted or matched-control papers.",
+        "n_sources": len(sources),
+        "n_targets": len(targets),
+        "source_sample_seed": args.seed,
+    }
     in_degree = dict(graph.in_degree())
     out_degree = dict(graph.out_degree())
     result = node_table.copy()
@@ -380,7 +408,7 @@ def approximate_metrics(graph: nx.DiGraph, node_table: pd.DataFrame, args: argpa
     result["out_degree"] = result["openalex_id"].map(out_degree).fillna(0).astype(int)
     result["pagerank"] = result["openalex_id"].map(pagerank).fillna(0.0)
     result["directed_betweenness"] = result["openalex_id"].map(betweenness).fillna(0.0)
-    return result
+    return result, metric_meta
 
 
 def permutation_check(metrics: pd.DataFrame, args: argparse.Namespace) -> tuple[pd.DataFrame, dict[str, Any]]:
@@ -491,7 +519,7 @@ def main() -> None:
     graph, nodes, edges, audit = build_graph(cache, focals, retracted_ids, args)
     if edges.empty:
         raise RuntimeError("No edges were reconstructed. Inspect step6_focal_neighborhoods.jsonl for API errors.")
-    metrics = approximate_metrics(graph, nodes, args)
+    metrics, metric_meta = approximate_metrics(graph, nodes, edges, args)
     null_df, permutation_summary = permutation_check(metrics, args)
 
     edge_composition = (edges.groupby(["edge_origin", "edge_type"], as_index=False).size()
@@ -531,7 +559,7 @@ def main() -> None:
         },
         "metric_computation": {
             "pagerank": "directed PageRank, alpha=0.85",
-            "directed_betweenness": f"NetworkX approximate normalized directed betweenness centrality, k={min(args.betweenness_k, graph.number_of_nodes())}, seed={args.seed}",
+            "directed_betweenness": metric_meta,
         },
         "label_permutation_design_check": permutation_summary,
         "outputs": [
