@@ -47,9 +47,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def canonical_id(value: Any) -> str:
+    """Normalize either a full OpenAlex URL or a bare work ID to uppercase W-ID."""
     if value is None or pd.isna(value):
         return ""
-    return str(value).strip().rstrip("/")
+    text = str(value).strip().rstrip("/")
+    return text.rsplit("/", 1)[-1].upper() if text else ""
 
 
 def holm_adjust(p_values: dict[str, float]) -> dict[str, float]:
@@ -153,6 +155,8 @@ def make_pair_data(output_dir: Path, data_dir: Path) -> pd.DataFrame:
     if not pairs_path.exists() or not metrics_path.exists():
         raise FileNotFoundError("Step 7 requires Step 4 matched pairs and Step 6 focal-node metrics in revision/output/.")
     pairs = pd.read_csv(pairs_path)
+    pairs["treated_id"] = pairs["treated_id"].map(canonical_id)
+    pairs["control_id"] = pairs["control_id"].map(canonical_id)
     metrics = pd.read_csv(metrics_path)
     needed_pairs = {"pair_id", "treated_id", "control_id", "publication_year", "paper_age_at_event", "concept", "treated_baseline_log_cites", "control_baseline_log_cites"}
     missing = needed_pairs - set(pairs.columns)
