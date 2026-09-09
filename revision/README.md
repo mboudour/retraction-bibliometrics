@@ -243,3 +243,27 @@ step6_expanded_network_nodes.csv.gz
 fig_step6_edge_composition.png
 fig_step6_label_permutation.png
 ```
+
+
+## Step 7 — Matched and adjusted test of H1 (boundary positioning)
+
+After Steps 4 and 6, run:
+
+```bash
+python revision/scripts/run_step_07.py
+```
+
+The script consumes `step4_matched_pairs.csv`, the Step 4 control cache, and
+`step6_focal_node_metrics.csv`. It tests H1 using the unnormalized focal-path
+brokerage count in three complementary ways: a paired sign-flip test of the mean
+within-pair difference in `log(1 + brokerage)`, a Wilcoxon signed-rank check,
+and an exact McNemar comparison of non-zero brokerage prevalence. It also fits
+an individual-paper model with matched-pair fixed effects and pair-clustered
+standard errors. Pair effects absorb article type, journal ISSN-L, publication
+year, and paper age at the pseudo-event; the model adjusts for individual
+pre-event citation level and a retracted-paper-by-topic-mismatch term.
+
+Outputs include `step7_h1_summary.json`, a complete inference table, model
+coefficients, pair-level data, a manuscript-ready LaTeX table, and a two-panel
+matched-comparison figure. Holm-adjusted p-values are reported across the four
+confirmatory/secondary H1 tests. No API call is made.
