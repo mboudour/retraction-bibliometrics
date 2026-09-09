@@ -213,13 +213,16 @@ This is a **sampled one-hop neighbourhood reconstruction**, not the entire
 OpenAlex graph. It has explicit caps and omits citation edges among context works
 that are not selected citing neighbours. The output diagnostics report the precise
 network size, fetch success, edge-type composition, retained/API-reported
-neighbour counts, and the context-to-context edge share. Directed betweenness is calculated as
-source-target betweenness on citation paths from a reproducible sample of works
-that cite a focal paper to the retained references of focal papers. This avoids
-the near-zero focal values produced by generic random-source approximation in a
-large one-hop directed graph. The script also runs a focal-label permutation
-design check for this focal-path brokerage measure; that check is unadjusted and
-is not the primary H1/H2 inference, which follows in Step 7.
+neighbour counts, and the context-to-context edge share. The brokerage metric is
+the \textbf{unnormalized focal-path brokerage count}: the number of sampled
+shortest directed paths from a reproducible sample of works that cite a focal
+paper to retained references of focal papers that pass through each node. This
+focuses the metric on the only directed paths for which the sampled one-hop graph
+can identify focal mediation. It avoids the near-zero focal values produced by
+generic normalized random-source approximation in a large one-hop graph. The
+script also runs a focal-label permutation design check for this metric; that
+check is unadjusted and is not the primary H1/H2 inference, which follows in
+Step 7.
 
 The cache `revision/data/step6_focal_neighborhoods.jsonl` permits an interrupted
 fetch to resume. Use `--mode analyze` to recompute outputs from a completed cache

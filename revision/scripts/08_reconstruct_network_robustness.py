@@ -392,9 +392,13 @@ def approximate_metrics(
     if not sources or not targets:
         raise RuntimeError("The reconstructed network lacks the citing-source or focal-reference target sets required for focal-path betweenness.")
     print(f"Computing source-target directed betweenness with {len(sources):,} citing sources and {len(targets):,} focal-reference targets …")
-    betweenness = nx.betweenness_centrality_subset(graph, sources=sources, targets=targets, normalized=True)
+    # Keep the unnormalized count. With a 350k-node one-hop graph, normalized
+    # source-target betweenness is necessarily extremely small (around 1e-10)
+    # and log(1+x) collapses the focal comparison. The raw score is the number
+    # of sampled directed shortest source-target paths mediated by each node.
+    betweenness = nx.betweenness_centrality_subset(graph, sources=sources, targets=targets, normalized=False)
     metric_meta = {
-        "definition": "Approximate normalized directed source-target betweenness centrality.",
+        "definition": "Unnormalized directed source-target focal-path brokerage count.",
         "source_set": "Reproducibly sampled works with an observed citation to a focal retracted or matched-control paper.",
         "target_set": "All retained references of focal retracted or matched-control papers.",
         "n_sources": len(sources),
@@ -416,10 +420,10 @@ def permutation_check(metrics: pd.DataFrame, args: argparse.Namespace) -> tuple[
     focal["treatment"] = focal["node_group"].eq("retracted").astype(int)
     if focal["treatment"].sum() < 20 or (1 - focal["treatment"]).sum() < 20:
         raise RuntimeError("Too few successfully reconstructed focal papers for the permutation check.")
-    focal["log_betweenness"] = np.log1p(focal["directed_betweenness"])
-    observed = float(focal.loc[focal["treatment"].eq(1), "log_betweenness"].mean() - focal.loc[focal["treatment"].eq(0), "log_betweenness"].mean())
+    focal["log_focal_path_brokerage"] = np.log1p(focal["directed_betweenness"])
+    observed = float(focal.loc[focal["treatment"].eq(1), "log_focal_path_brokerage"].mean() - focal.loc[focal["treatment"].eq(0), "log_focal_path_brokerage"].mean())
     labels = focal["treatment"].to_numpy(copy=True)
-    values = focal["log_betweenness"].to_numpy(dtype=float)
+    values = focal["log_focal_path_brokerage"].to_numpy(dtype=float)
     rng = np.random.default_rng(args.seed)
     null_values: list[float] = []
     for iteration in range(1, args.permutations + 1):
@@ -429,7 +433,7 @@ def permutation_check(metrics: pd.DataFrame, args: argparse.Namespace) -> tuple[
     p_value = float((np.sum(np.abs(null) >= abs(observed)) + 1) / (len(null) + 1))
     null_df = pd.DataFrame({"permutation": np.arange(1, len(null) + 1), "null_mean_difference_log1p_betweenness": null})
     summary = {
-        "outcome": "mean difference in log(1 + directed betweenness), retracted minus matched control focal papers",
+        "outcome": "mean difference in log(1 + unnormalized focal-path brokerage), retracted minus matched control focal papers",
         "n_retracted_focals": int(focal["treatment"].sum()),
         "n_matched_control_focals": int((1 - focal["treatment"]).sum()),
         "observed_difference": observed,
@@ -478,9 +482,9 @@ def make_figures(edges: pd.DataFrame, null_df: pd.DataFrame, perm_summary: dict[
     observed = float(perm_summary["observed_difference"])
     ax.axvline(observed, color="#B2182B", linewidth=2.4, label=f"Observed focal-label difference = {observed:.4f}")
     ax.axvline(0, color="black", linewidth=0.9)
-    ax.set_xlabel("Retracted minus matched-control mean log(1 + directed betweenness)")
+    ax.set_xlabel("Retracted minus matched-control mean log(1 + focal-path brokerage)")
     ax.set_ylabel("Number of label permutations")
-    ax.set_title("Label-Permutation Design Check for Focal Directed Betweenness")
+    ax.set_title("Label-Permutation Design Check for Focal-Path Brokerage")
     ax.legend(frameon=False)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
