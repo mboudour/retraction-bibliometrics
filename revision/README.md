@@ -303,9 +303,11 @@ python revision/scripts/run_step_09.py --mode all --api-key "$OPENALEX_API_KEY" 
 
 The first run creates a cached sample of non-retracted OpenAlex research articles
 in `revision/data/step9_nonretracted_candidate_cache.jsonl`. It is resumable. The
-analysis selects one control per retracted paper without replacement, prioritizing
-exact publication-year and broad-field matches; the match level is recorded in
-`step9_control_matching_audit.csv`.
+analysis selects one control per retracted paper without replacement using
+**exact publication-year and broad-field matches only**. Retraction cases without
+a strict match are excluded and recorded in `step9_control_matching_audit.csv`;
+there is no year-only fallback because it would confound classification with field
+composition.
 
 Two feature sets are reported separately: **at-publication** (title length,
 author count, reference count, open-access status, and abstract availability) and

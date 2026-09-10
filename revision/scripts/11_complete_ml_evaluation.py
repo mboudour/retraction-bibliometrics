@@ -337,17 +337,14 @@ def stratified_control_sample(positives: pd.DataFrame, raw_controls: list[dict[s
     selected: list[int] = []
     records: list[dict[str, Any]] = []
     by_stratum: dict[tuple[int, str], list[int]] = defaultdict(list)
-    by_year: dict[int, list[int]] = defaultdict(list)
     for index, row in controls.iterrows():
         by_stratum[(int(row.publication_year), str(row.broad_field))].append(index)
-        by_year[int(row.publication_year)].append(index)
     for _, pos in positives.sample(frac=1, random_state=seed).iterrows():
         year, field = int(pos.publication_year), str(pos.broad_field)
         candidates = [i for i in by_stratum[(year, field)] if i not in used]
+        # Strict matching is intentional. A year-only fallback would retain a much
+        # larger sample but would reintroduce field composition as a classifier.
         match_level = "year_field"
-        if not candidates:
-            candidates = [i for i in by_year[year] if i not in used]
-            match_level = "year_only"
         if not candidates:
             records.append({"publication_year": year, "broad_field": field, "status": "unmatched"})
             continue
@@ -562,6 +559,7 @@ def main() -> None:
     results_parts, calibration_parts, all_curves = [], [], {}
     for feature_set, features in (("at_publication", AT_PUBLICATION), ("early_warning", EARLY_WARNING)):
         for protocol in ("random", "temporal", "cross_discipline"):
+            print(f"Step 9: evaluating {feature_set.replace('_', ' ')} features under {protocol.replace('_', ' ')} validation …", flush=True)
             result, calibration, curves, _ = run_protocol(data, feature_set, features, protocol, args)
             results_parts.append(result); calibration_parts.append(calibration); all_curves.update(curves)
     results = pd.concat(results_parts, ignore_index=True)
@@ -594,7 +592,8 @@ def main() -> None:
         "created_at": now_utc(), "study_design": "Retrospective binary classification of retracted versus non-retracted research articles.",
         "interpretation_limit": "Model results do not estimate causal determinants of retraction and should not be interpreted as a deployment-ready screening system.",
         "positive_eligible": int(len(positive)), "matched_pairs": int(len(matched_positive)), "analysis_rows": int(len(data)),
-        "class_prevalence": float(data.label.mean()), "control_matching": "One-to-one sampling without replacement, prioritizing exact publication-year and broad-field matches; publication-year-only fallback recorded in step9_control_matching_audit.csv.",
+        "class_prevalence": float(data.label.mean()),         "control_matching": "One-to-one sampling without replacement using exact publication-year and broad-field matches only; unmatched retracted papers are excluded and recorded in step9_control_matching_audit.csv.",
+
         "feature_sets": {"at_publication": AT_PUBLICATION, "early_warning_year1": EARLY_WARNING},
         "excluded_features": ["publication year", "retraction year", "total citations", "post-retraction citations", "citation-network features", "author-level historical retraction counts"],
         "validation_protocols": {"random": "stratified 80/20 split", "temporal": f"train publication year <= {args.temporal_cutoff}; test > {args.temporal_cutoff}", "cross_discipline": "leave-one-eligible-broad-field-out; pooled held-out predictions"},
