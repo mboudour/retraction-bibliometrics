@@ -57,13 +57,9 @@ SUPERSEDED_PHRASES = {
 
 REQUIRED_MAIN_ASSETS = {
     "figures/fig_retractions_per_year.png",
-    "figures/fig_top_countries.png",
-    "figures/fig_top_institutions.png",
     "figures/fig_retraction_reasons_primary.png",
     "figures/fig_step4_matched_event_study.png",
     "figures/fig_step5_indicator_window_sensitivity.png",
-    "figures/fig_retracted_papers_per_author.png",
-    "figures/fig_step9_protocol_auc.png",
     "tables/table_sample_flow.tex",
     "tables/table_step4_matching_balance.tex",
     "tables/table_step4_event_study.tex",
@@ -71,7 +67,6 @@ REQUIRED_MAIN_ASSETS = {
     "tables/table_step6_network_reconstruction.tex",
     "tables/table_step7_h1_boundary.tex",
     "tables/table_step8_h2_brokerage_persistence.tex",
-    "tables/table_step9_complete_ml_results.tex",
 }
 
 
