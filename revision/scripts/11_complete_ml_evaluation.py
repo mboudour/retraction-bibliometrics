@@ -76,6 +76,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--end-year", type=int, default=2024)
     parser.add_argument("--temporal-cutoff", type=int, default=2021, help="Train through this publication year; test afterward.")
     parser.add_argument("--control-multiplier", type=float, default=2.0, help="Cached negative candidates targeted per eligible positive paper.")
+    parser.add_argument("--max-matched-pairs", type=int, default=2500, help="Maximum strict year-and-field matched pairs for the bounded local evaluation; use 0 for all strict pairs.")
     parser.add_argument("--batch-size", type=int, default=200, choices=(100, 200))
     parser.add_argument("--seed", type=int, default=SEED)
     return parser.parse_args()
@@ -357,6 +358,34 @@ def stratified_control_sample(positives: pd.DataFrame, raw_controls: list[dict[s
     return selected_controls, match_audit
 
 
+def cap_matched_pairs(positives: pd.DataFrame, controls: pd.DataFrame, max_pairs: int, seed: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Subsample aligned strict matches proportionally by broad field for bounded runtime."""
+    if max_pairs <= 0 or len(positives) <= max_pairs:
+        return positives.reset_index(drop=True), controls.reset_index(drop=True)
+    pairs = positives[["publication_year", "broad_field"]].copy()
+    pairs["pair_index"] = np.arange(len(pairs))
+    counts = pairs.groupby("broad_field", sort=True).size()
+    quotas = counts / counts.sum() * max_pairs
+    allocation = np.floor(quotas).astype(int)
+    # Every represented field receives at least one pair; largest remainders fill the balance.
+    allocation = allocation.clip(lower=1)
+    while allocation.sum() > max_pairs:
+        candidate = allocation[allocation > 1].sort_values(ascending=False).index[0]
+        allocation.loc[candidate] -= 1
+    remainders = (quotas - np.floor(quotas)).sort_values(ascending=False)
+    for field in remainders.index:
+        if allocation.sum() >= max_pairs:
+            break
+        allocation.loc[field] += 1
+    rng = np.random.default_rng(seed)
+    chosen: list[int] = []
+    for field, group in pairs.groupby("broad_field", sort=True):
+        n = min(int(allocation.loc[field]), len(group))
+        chosen.extend(rng.choice(group.pair_index.to_numpy(), size=n, replace=False).tolist())
+    chosen = sorted(chosen)
+    return positives.iloc[chosen].reset_index(drop=True), controls.iloc[chosen].reset_index(drop=True)
+
+
 def make_models() -> dict[str, Any]:
     return {
         "Logistic regression": Pipeline([("scale", StandardScaler()), ("model", LogisticRegression(C=1.0, max_iter=2000, class_weight=None, random_state=SEED))]),
@@ -552,6 +581,7 @@ def main() -> None:
     if len(matched_positive) != len(controls):
         # Match audit rows preserve the shuffled positive order; this is an integrity guard.
         raise RuntimeError("Control matching produced inconsistent treated/control rows.")
+    matched_positive, controls = cap_matched_pairs(matched_positive, controls, args.max_matched_pairs, args.seed)
     data = pd.concat([matched_positive, controls], ignore_index=True).sample(frac=1, random_state=args.seed).reset_index(drop=True)
     if data.label.value_counts().min() < 500:
         raise RuntimeError("Too few matched examples for Step 9 model evaluation.")
@@ -591,7 +621,7 @@ def main() -> None:
     write_json(output / "step9_ml_summary.json", {
         "created_at": now_utc(), "study_design": "Retrospective binary classification of retracted versus non-retracted research articles.",
         "interpretation_limit": "Model results do not estimate causal determinants of retraction and should not be interpreted as a deployment-ready screening system.",
-        "positive_eligible": int(len(positive)), "matched_pairs": int(len(matched_positive)), "analysis_rows": int(len(data)),
+        "positive_eligible": int(len(positive)), "strict_match_pairs_before_cap": int(match_audit.status.eq("year_field").sum()), "matched_pairs": int(len(matched_positive)), "max_matched_pairs": int(args.max_matched_pairs), "analysis_rows": int(len(data)),
         "class_prevalence": float(data.label.mean()),         "control_matching": "One-to-one sampling without replacement using exact publication-year and broad-field matches only; unmatched retracted papers are excluded and recorded in step9_control_matching_audit.csv.",
 
         "feature_sets": {"at_publication": AT_PUBLICATION, "early_warning_year1": EARLY_WARNING},
@@ -601,7 +631,7 @@ def main() -> None:
         "models": {name: str(model) for name, model in make_models().items()},
         "outputs": ["step9_complete_model_results.csv", "step9_calibration_bins.csv", "step9_control_matching_audit.csv", "step9_relative_permutation_importance.csv", "table_step9_complete_ml_results.tex", "fig_step9_protocol_auc.png/.pdf", "fig_step9_calibration.png/.pdf", "fig_step9_relative_importance.png/.pdf"],
     })
-    print(f"Step 9 complete: {len(matched_positive):,} matched retracted/non-retracted pairs; {len(results)} evaluation rows.")
+    print(f"Step 9 complete: {len(matched_positive):,} strict year-and-field matched retracted/non-retracted pairs; {len(results)} evaluation rows.")
 
 
 if __name__ == "__main__":

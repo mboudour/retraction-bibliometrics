@@ -322,3 +322,14 @@ cross-disciplinary validation. Output includes accuracy, precision, recall, F1,
 ROC-AUC, PR-AUC, log loss, MCC, Brier score, 10-bin ECE, confusion-matrix
 counts, calibration-bin data, and relative permutation importance. The analyses
 are retrospective; they are not a deployment-ready retraction-screening system.
+
+
+### Bounded local run
+
+For a computationally bounded local rerun, the script defaults to a reproducible
+proportional subsample of **2,500 strict year-and-field matched pairs**. This cap
+is applied only after strict matching and preserves the broad-field composition
+of the strict-match cohort. It makes the four-model, three-protocol evaluation
+feasible on a laptop without weakening the matching rule. Set
+`--max-matched-pairs 0` to analyse every strict match when sufficient compute is
+available.
