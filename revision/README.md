@@ -333,3 +333,24 @@ of the strict-match cohort. It makes the four-model, three-protocol evaluation
 feasible on a laptop without weakening the matching rule. Set
 `--max-matched-pairs 0` to analyse every strict match when sufficient compute is
 available.
+
+
+## Step 10 — Display, caption, and cross-reference audit
+
+After integrating all revised figures and LaTeX tables into the manuscript folder,
+run:
+
+```bash
+python revision/scripts/run_step_10.py \
+  --manuscript "/absolute/path/to/manuscript_revision.tex" \
+  --bib "/absolute/path/to/paper.bib"
+```
+
+The audit does not modify the manuscript. It writes
+`step10_display_audit.csv`, `step10_display_audit.md`, and
+`step10_display_audit_summary.json` to `revision/output/`. It checks missing
+figure/table assets, undefined and duplicate labels, unused display labels,
+missing bibliography keys, stale filenames/terminology from the submitted
+version, and short captions requiring editorial review. Run it again only after
+all manuscript display changes have been made. A submission-ready manuscript
+must have zero `ERROR` findings.
