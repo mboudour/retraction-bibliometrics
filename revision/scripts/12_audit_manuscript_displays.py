@@ -6,9 +6,12 @@ files, checks that all referenced assets exist, finds undefined or duplicate
 labels, identifies orphaned display assets, and flags known superseded wording
 and display filenames from the submitted version.
 
-Run from project root, for example:
-  python revision/scripts/12_audit_manuscript_displays.py \
-      --manuscript "/path/to/manuscript_revision.tex"
+Run from the computations directory:
+  python revision/scripts/12_audit_manuscript_displays.py
+
+The script automatically searches the parent Retraction Study directory for
+`manuscript_revision.tex` (then `paper.tex`) and `paper.bib`. Explicit paths may
+still be supplied with `--manuscript` and `--bib` when needed.
 """
 from __future__ import annotations
 
@@ -54,7 +57,7 @@ REQUIRED_MAIN_ASSETS = {
     "figures/fig_retraction_reasons_primary.png",
     "figures/fig_step4_matched_event_study.png",
     "figures/fig_step5_indicator_window_sensitivity.png",
-    "figures/fig_coauthor_ripple.png",
+    "figures/fig_retracted_papers_per_author.png",
     "figures/fig_step9_protocol_auc.png",
     "tables/table_sample_flow.tex",
     "tables/table_step6_network_reconstruction.tex",
@@ -69,9 +72,27 @@ REQUIRED_MAIN_ASSETS = {
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Audit manuscript assets and cross-references.")
-    parser.add_argument("--manuscript", required=True, help="Path to the manuscript .tex file.")
-    parser.add_argument("--bib", default="", help="Optional path to paper.bib for citation-key validation.")
+    parser.add_argument("--manuscript", default="", help="Optional path to the manuscript .tex file.")
+    parser.add_argument("--bib", default="", help="Optional path to paper.bib.")
     return parser.parse_args()
+
+
+def discover_file(search_root: Path, preferred_names: tuple[str, ...], description: str) -> Path:
+    """Find a single preferred project file without asking the user for a path."""
+    candidates: list[Path] = []
+    for name in preferred_names:
+        candidates.extend(search_root.rglob(name))
+    candidates = sorted(
+        {p.resolve() for p in candidates if p.is_file()},
+        key=lambda p: (preferred_names.index(p.name), len(p.parts), str(p)),
+    )
+    if not candidates:
+        names = " or ".join(f"`{name}`" for name in preferred_names)
+        raise FileNotFoundError(
+            f"Could not automatically find {description} ({names}) below {search_root}. "
+            "Move the file into the Retraction Study directory or supply an explicit path."
+        )
+    return candidates[0]
 
 
 def resolve_tex(base: Path, name: str) -> Path:
@@ -124,7 +145,11 @@ def main() -> None:
     args = parse_args()
     root = project_root()
     output = revision_dirs(root)["output"]
-    manuscript = Path(args.manuscript).expanduser().resolve()
+    search_root = root.parent
+    manuscript = (Path(args.manuscript).expanduser().resolve() if args.manuscript else
+                  discover_file(search_root, ("manuscript_revision.tex", "paper.tex"), "the manuscript"))
+    if not manuscript.exists():
+        raise FileNotFoundError(f"Manuscript not found: {manuscript}")
     text, sources, records = collect_tex(manuscript)
     base = manuscript.parent
 
@@ -153,7 +178,8 @@ def main() -> None:
         if asset not in graphics and asset not in inputs:
             records.append({"kind": "required_revised_asset", "item": asset, "status": "WARN", "detail": "Expected revised asset is not currently referenced."})
 
-    bib = Path(args.bib).expanduser().resolve() if args.bib else None
+    bib = (Path(args.bib).expanduser().resolve() if args.bib else
+           discover_file(search_root, ("paper.bib",), "the bibliography"))
     if bib:
         keys = read_bib_keys(bib)
         cited = set()
